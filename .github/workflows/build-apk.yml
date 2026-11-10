@@ -20,6 +20,16 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Make sure www/index.html exists
+        run: |
+          mkdir -p www
+          if [ ! -f www/index.html ]; then
+            f=$(find . -name index.html -not -path './node_modules/*' -not -path './android/*' | head -1)
+            echo "found: $f"
+            [ -n "$f" ] && cp "$f" www/index.html
+          fi
+          ls -la www
+
       - name: Install dependencies
         run: npm install
 
