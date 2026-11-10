@@ -1,0 +1,8 @@
+{
+  "appId": "com.mostafa.lite",
+  "appName": "السبورة والكتب",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
