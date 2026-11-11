@@ -1,16 +1,40 @@
 {
-  "name": "mostafa-lite-app",
+  "name": "board-pdf",
+  "productName": "بورد PDF",
   "version": "1.0.0",
   "private": true,
+  "main": "main.js",
   "scripts": {
     "sync": "npx cap sync android",
-    "open": "npx cap open android"
+    "open": "npx cap open android",
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis --x64"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/core": "^6.0.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.0.0"
+    "@capacitor/cli": "^6.0.0",
+    "electron": "31.7.7",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "com.boardpdf.app",
+    "productName": "بورد PDF",
+    "directories": { "output": "dist" },
+    "files": [
+      "main.js",
+      "package.json",
+      "www/**/*"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "BoardPDF-Setup-${version}.${ext}"
+    }
   }
 }
