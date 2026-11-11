@@ -25,6 +25,7 @@
     "directories": { "output": "dist" },
     "files": [
       "main.js",
+      "preload.js",
       "package.json",
       "www/**/*"
     ],
