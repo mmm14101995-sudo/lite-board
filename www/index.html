@@ -6529,12 +6529,6 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             return pageNo + '|' + Math.round(w) + 'x' + Math.round(h) + '|' + dpr;
         }
 
-        // حد أقصى لمساحة الكانفاس: أندرويد بيرسم صفحة بيضا لو الكانفاس كبير زيادة عن اللزوم
-        function canvasAreaScale(base) {
-            const maxArea = document.body.classList.contains('lite') ? 8e6 : 12e6;
-            return Math.sqrt(maxArea / (base.width * base.height));
-        }
-
         async function renderReader(keepView) {
             if (!reader.doc) return;
             const token = ++reader.token;
@@ -6555,7 +6549,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
                 const fit = Math.min((cssW / count) / base.width, cssH / base.height);
                 const q = Math.max(dpr, readerQuality, document.body.classList.contains('lite') ? 0 : 3);
                 const maxPx = document.body.classList.contains('lite') ? 4096 : 6144;   // حد أقصى لأبعاد الكانفاس
-                const renderScale = Math.min(fit * q, maxPx / Math.max(base.width, base.height), canvasAreaScale(base));
+                const renderScale = Math.min(fit * q, maxPx / Math.max(base.width, base.height));
                 const vp = page.getViewport({ scale: renderScale });
                 const key = cacheKey(pageNo, vp.width, vp.height, q);
                 let pc = pageCache.get(key);
@@ -6566,7 +6560,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
                     await page.render({ canvasContext: pc.getContext('2d'), viewport: vp }).promise;
                     if (token !== reader.token) return;
                     pageCache.set(key, pc);
-                    if (pageCache.size > (document.body.classList.contains('lite') ? 4 : 6)) pageCache.delete(pageCache.keys().next().value);
+                    if (pageCache.size > 8) pageCache.delete(pageCache.keys().next().value);
                 }
                 const cssWpx = (base.width * fit) + 'px';
                 const cssHpx = (base.height * fit) + 'px';
@@ -6636,7 +6630,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
                         if (token !== reader.token) return;
                         const base = page.getViewport({ scale: 1 });
                         const fit = Math.min((cssW / count) / base.width, cssH / base.height);
-                        const vp = page.getViewport({ scale: Math.min(fit * q, maxPx / Math.max(base.width, base.height), canvasAreaScale(base)) });
+                        const vp = page.getViewport({ scale: Math.min(fit * q, maxPx / Math.max(base.width, base.height)) });
                         const key = cacheKey(pageNo, vp.width, vp.height, q);
                         if (!pageCache.has(key)) {
                             const pc = document.createElement('canvas');
@@ -6646,7 +6640,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
                             if (token !== reader.token) return;   // المستخدم قلّب: نرمي النتيجة بدل ما نعطّله
                             pageCache.set(key, pc);
                             // ما نطردش الصفحة الحالية من الكاش: نحدّ الحجم بس
-                            if (pageCache.size > (document.body.classList.contains('lite') ? 4 : 6)) pageCache.delete(pageCache.keys().next().value);
+                            if (pageCache.size > 8) pageCache.delete(pageCache.keys().next().value);
                         }
                     } catch (e) { /* التجهيز المسبق اختياري */ }
                     next();
