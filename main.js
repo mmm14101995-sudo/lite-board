@@ -1,27 +1,21 @@
-const { app, BrowserWindow, Menu, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// ---------- المسارات ----------
-// index.html وباقي ملفات الواجهة جوه مجلد www (نفس ملف الاندرويد)
+// ملفات الواجهة (نفس مجلد assets بتاع الأندرويد): www/index.html
 const WWW = path.join(__dirname, 'www');
 
-// بورت ثابت عشان localStorage وأي إعدادات على مستوى المتصفح تفضل محفوظة بين مرات التشغيل
+// بورت ثابت عشان localStorage وإعدادات المتصفح تفضل محفوظة بين مرات التشغيل
 const PREFERRED_PORT = 47321;
 
-// الكتب والبيانات في مجلد المستندات: Documents\BoardPDF\{books,data,exports}
-let ROOT, BOOKS_DIR, DATA_DIR, EXPORT_DIR, STATE_FILE;
+// الملفات بتتحفظ في: Documents\BoardPDF\pdfs  و  Documents\BoardPDF\annotations
+// (نفس فكرة filesDir/pdfs و filesDir/annotations في الأندرويد)
+let PDF_DIR, ANN_DIR;
 
 let server = null;
 let serverPort = 0;
 let mainWindow = null;
-
-const REVIEW_FOLDERS = new Set(['reviews', 'review', 'ملازم', 'مراجعات']);
-const EXAM_FOLDERS = new Set(['exams', 'exam', 'اختبارات', 'اختبار']);
-const GRADE_RE = /^[a-z0-9_-]{1,20}$/i;
-const PICK_FOLDERS = { books: '', reviews: 'reviews', exams: 'exams' };
-const MAX_BODY = 256 * 1024 * 1024; // حد أقصى لحجم الطلب (الحالة وملفات PDF المصدّرة)
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -39,6 +33,7 @@ const MIME = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.wasm': 'application/wasm',
   '.pdf': 'application/pdf',
   '.txt': 'text/plain; charset=utf-8'
 };
@@ -53,109 +48,173 @@ function initPaths() {
     base = path.join(app.getPath('userData'), 'BoardPDF');
     fs.mkdirSync(base, { recursive: true });
   }
-  ROOT = base;
-  BOOKS_DIR = path.join(ROOT, 'books');
-  DATA_DIR = path.join(ROOT, 'data');
-  EXPORT_DIR = path.join(ROOT, 'exports');
-  STATE_FILE = path.join(DATA_DIR, 'state.json');
-  for (const d of [BOOKS_DIR, DATA_DIR, EXPORT_DIR]) fs.mkdirSync(d, { recursive: true });
+  PDF_DIR = path.join(base, 'pdfs');
+  ANN_DIR = path.join(base, 'annotations');
+  fs.mkdirSync(PDF_DIR, { recursive: true });
+  fs.mkdirSync(ANN_DIR, { recursive: true });
 }
 
-// ---------- الكتب ----------
-// أي PDF جوه مجلد اسمه reviews أو ملازم يتعتبر ملزمة، وجوه exams اختبار، والباقي كتب
-function walkBooks(dir, subParts, gradeName, items) {
-  let entries;
+// ---------- نفس منطق جسر الأندرويد (MainActivity.Bridge) ----------
+// أي حرف مش حرف/رقم/نقطة/شرطة/مسافة يتحول لـ _
+function safeName(n) {
+  return String(n).replace(/[^\p{L}\p{N}._ \-]/gu, '_');
+}
+
+function annFile(name) {
+  return path.join(ANN_DIR, safeName(name) + '.json');
+}
+
+function safePdf(name) {
+  const f = path.join(PDF_DIR, safeName(name));
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    return fs.statSync(f).isFile() && path.dirname(f) === PDF_DIR ? f : null;
   } catch (e) {
+    return null;
+  }
+}
+
+function listPdfs() {
+  let names = [];
+  try {
+    names = fs
+      .readdirSync(PDF_DIR, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.pdf'))
+      .map((e) => e.name)
+      .sort();
+  } catch (e) {
+    /* مجلد فاضي */
+  }
+  return JSON.stringify(names);
+}
+
+function loadAnnotations(name) {
+  try {
+    return fs.readFileSync(annFile(name), 'utf8');
+  } catch (e) {
+    return '';
+  }
+}
+
+function saveAnnotations(name, json) {
+  try {
+    const f = annFile(name);
+    const tmp = f + '.tmp';
+    fs.writeFileSync(tmp, String(json), 'utf8');
+    fs.renameSync(tmp, f);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function deletePdf(name) {
+  const f = safePdf(name);
+  if (!f) return false;
+  try {
+    fs.rmSync(annFile(name), { force: true });
+    fs.unlinkSync(f);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function listNotebooks() {
+  let ids = [];
+  try {
+    ids = fs
+      .readdirSync(ANN_DIR, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.startsWith('nb_') && e.name.endsWith('.json'))
+      .map((e) => e.name.slice(0, -'.json'.length))
+      .sort();
+  } catch (e) {
+    /* مجلد فاضي */
+  }
+  return JSON.stringify(ids);
+}
+
+function deleteNotebook(id) {
+  id = String(id);
+  if (!id.startsWith('nb_')) return false;
+  try {
+    fs.unlinkSync(annFile(id));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// الصفحة بتنادي pickPdf() وترجع فوراً، والنتيجة بتيجي عن طريق onPdfAdded / onPdfError
+function notifyPage(fn) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents
+      .executeJavaScript(`if (window.${fn}) ${fn}();`)
+      .catch(() => {});
+  }
+}
+
+async function doPickPdf() {
+  const opts = {
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'PDF files', extensions: ['pdf'] }]
+  };
+  const result =
+    mainWindow && !mainWindow.isDestroyed()
+      ? await dialog.showOpenDialog(mainWindow, opts)
+      : await dialog.showOpenDialog(opts);
+  if (result.canceled || !result.filePaths.length) return; // المستخدم ألغى
+
+  try {
+    for (const src of result.filePaths) {
+      let name = path.basename(src);
+      if (!name.toLowerCase().endsWith('.pdf')) name += '.pdf';
+      fs.copyFileSync(src, path.join(PDF_DIR, safeName(name)));
+    }
+    notifyPage('onPdfAdded');
+  } catch (e) {
+    notifyPage('onPdfError');
+  }
+}
+
+function pickPdf() {
+  doPickPdf().catch(() => notifyPage('onPdfError'));
+  return null;
+}
+
+const bridge = {
+  listPdfs,
+  loadAnnotations,
+  saveAnnotations,
+  deletePdf,
+  listNotebooks,
+  deleteNotebook,
+  pickPdf
+};
+
+// الـ preload بيكلّم الدوال دي بشكل متزامن زي ما بيحصل في الأندرويد
+ipcMain.on('android:call', (event, method, args) => {
+  let url = '';
+  try {
+    url = event.senderFrame.url;
+  } catch (e) {
+    /* تجاهل */
+  }
+  if (!url.startsWith(`http://127.0.0.1:${serverPort}/`)) {
+    event.returnValue = null;
     return;
   }
-  const folders = subParts.map((p) => p.toLowerCase());
-  const kind = folders.some((f) => EXAM_FOLDERS.has(f))
-    ? 'exams'
-    : folders.some((f) => REVIEW_FOLDERS.has(f))
-      ? 'reviews'
-      : 'books';
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      walkBooks(path.join(dir, entry.name), [...subParts, entry.name], gradeName, items);
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.pdf')) {
-      const id = [gradeName, ...subParts, entry.name].join('/');
-      items.push({
-        id,
-        title: path.parse(entry.name).name,
-        url: '/books/' + id.split('/').map(encodeURIComponent).join('/'),
-        grade: gradeName.toLowerCase(),
-        kind
-      });
-    }
-  }
-}
-
-function scanBooks() {
-  const items = [];
-  let grades;
   try {
-    grades = fs.readdirSync(BOOKS_DIR, { withFileTypes: true });
+    const fn = typeof method === 'string' && Object.hasOwn(bridge, method) ? bridge[method] : null;
+    const out = fn ? fn(...(Array.isArray(args) ? args : [])) : null;
+    event.returnValue = out === undefined ? null : out;
   } catch (e) {
-    return items;
+    event.returnValue = null;
   }
-  for (const g of grades) {
-    if (!g.isDirectory() || !GRADE_RE.test(g.name)) continue;
-    walkBooks(path.join(BOOKS_DIR, g.name), [], g.name, items);
-  }
-  items.sort((a, b) => {
-    const x = a.title.toLowerCase();
-    const y = b.title.toLowerCase();
-    return x < y ? -1 : x > y ? 1 : 0;
-  });
-  return items;
-}
+});
 
-// ---------- الحفظ على القرص ----------
-function loadState() {
-  try {
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveState(data) {
-  const tmp = STATE_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(data), 'utf8');
-  fs.renameSync(tmp, STATE_FILE);
-}
-
-// ---------- أدوات السيرفر ----------
-function sendJson(res, data, status = 200) {
-  const body = Buffer.from(JSON.stringify(data), 'utf8');
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': body.length,
-    'Cache-Control': 'no-store'
-  });
-  res.end(body);
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    req.on('data', (c) => {
-      size += c.length;
-      if (size > MAX_BODY) {
-        reject(new Error('too large'));
-        req.destroy();
-        return;
-      }
-      chunks.push(c);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
-}
+// ---------- السيرفر المحلي (بديل WebViewAssetLoader) ----------
+// /assets/*  →  مجلد www        (زي https://appassets.androidplatform.net/assets/)
+// /pdfs/*    →  مجلد الكتب      (زي https://appassets.androidplatform.net/pdfs/)
 
 // يمنع الخروج بره المجلد الأساسي (path traversal)
 function safeJoin(base, rel) {
@@ -209,146 +268,43 @@ function serveFile(req, res, full, contentType) {
   });
 }
 
-function isLocalOrigin(value) {
-  return (
-    value === `http://127.0.0.1:${serverPort}` ||
-    value === `http://localhost:${serverPort}`
-  );
-}
-
-// ---------- طلبات POST ----------
-async function handlePost(req, res, p) {
-  const raw = await readBody(req);
-  let payload;
-  try {
-    payload = JSON.parse(raw.toString('utf8') || '{}');
-  } catch (e) {
-    return sendJson(res, { ok: false }, 400);
-  }
-
-  if (p === '/api/state') {
-    saveState(payload);
-    return sendJson(res, { ok: true });
-  }
-
-  if (p === '/api/books/pick') {
-    const grade = String(payload.grade || 'sec3').toLowerCase();
-    const kind = String(payload.kind || 'books');
-    const folder = Object.hasOwn(PICK_FOLDERS, kind) ? PICK_FOLDERS[kind] : undefined;
-    if (!GRADE_RE.test(grade) || folder === undefined) return sendJson(res, { ok: false }, 400);
-
-    const opts = {
-      properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'PDF files', extensions: ['pdf'] }]
-    };
-    const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, opts)
-      : await dialog.showOpenDialog(opts);
-    if (result.canceled || !result.filePaths.length) {
-      return sendJson(res, { ok: false, cancelled: true });
-    }
-
-    const gradeDir = grade.toUpperCase();
-    const target = folder ? path.join(BOOKS_DIR, gradeDir, folder) : path.join(BOOKS_DIR, gradeDir);
-    fs.mkdirSync(target, { recursive: true });
-
-    let count = 0;
-    const ids = [];
-    for (const src of result.filePaths) {
-      const name = path.basename(src);
-      if (!name.toLowerCase().endsWith('.pdf')) continue;
-      fs.copyFileSync(src, path.join(target, name));
-      count++;
-      // نفس المعرّف اللي scanBooks بترجّعه
-      ids.push([gradeDir, ...(folder ? [folder] : []), name].join('/'));
-    }
-    return sendJson(res, { ok: true, count, ids });
-  }
-
-  if (p === '/api/open-folder') {
-    const grade = String(payload.grade || 'sec3').toLowerCase();
-    if (!GRADE_RE.test(grade)) return sendJson(res, { ok: false }, 400);
-    const folder = path.join(BOOKS_DIR, grade.toUpperCase(), 'exams');
-    fs.mkdirSync(folder, { recursive: true });
-    shell.openPath(folder);
-    return sendJson(res, { ok: true, path: folder });
-  }
-
-  if (p === '/api/open-external') {
-    const url = String(payload.url || '');
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
-    return sendJson(res, { ok: true });
-  }
-
-  if (p === '/api/save-pdf') {
-    let name = String(payload.name || 'board.pdf').replace(/[\\/:*?"<>|]/g, '_');
-    if (!name || name === '.' || name === '..') name = 'board.pdf';
-    fs.mkdirSync(EXPORT_DIR, { recursive: true });
-    const outPath = path.join(EXPORT_DIR, name);
-    fs.writeFileSync(outPath, Buffer.from(String(payload.data || ''), 'base64'));
-    return sendJson(res, { ok: true, path: outPath });
-  }
-
-  res.writeHead(404);
-  res.end('Not found');
-}
-
-// ---------- السيرفر المحلي ----------
-async function handle(req, res) {
+function handle(req, res) {
   // حماية: نقبل بس الطلبات الموجهة للعنوان المحلي (ضد DNS rebinding)
   const host = req.headers.host;
   if (host !== `127.0.0.1:${serverPort}` && host !== `localhost:${serverPort}`) {
     res.writeHead(403);
     return res.end('Forbidden');
   }
-
-  const url = new URL(req.url, `http://127.0.0.1:${serverPort}`);
-  const p = url.pathname;
-
-  if (req.method === 'POST') {
-    // حماية: نرفض طلبات POST اللي جاية من أي موقع تاني
-    if (req.headers.origin && !isLocalOrigin(req.headers.origin)) {
-      res.writeHead(403);
-      return res.end('Forbidden');
-    }
-    return handlePost(req, res, p);
-  }
-
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405);
     return res.end('Method not allowed');
   }
 
-  if (p === '/api/books') return sendJson(res, scanBooks());
-  if (p === '/api/state') return sendJson(res, loadState());
-  if (p === '/api/media/list') return sendJson(res, []); // الفيديوهات غير مدعومة في السبورة
-
-  if (p.startsWith('/books/')) {
-    let rel;
-    try {
-      rel = decodeURIComponent(p.slice('/books/'.length));
-    } catch (e) {
-      res.writeHead(400);
-      return res.end('Bad request');
-    }
-    const full = safeJoin(BOOKS_DIR, rel);
-    if (!full || !full.toLowerCase().endsWith('.pdf')) {
-      res.writeHead(404);
-      return res.end('Not found');
-    }
-    return serveFile(req, res, full, 'application/pdf');
-  }
-
-  // ملفات الواجهة الثابتة من www
-  let rel;
+  let p;
   try {
-    rel = decodeURIComponent(p);
+    p = decodeURIComponent(new URL(req.url, `http://127.0.0.1:${serverPort}`).pathname);
   } catch (e) {
     res.writeHead(400);
     return res.end('Bad request');
   }
-  if (rel === '/' || rel === '') rel = '/index.html';
-  const full = safeJoin(WWW, rel);
+
+  let base;
+  let rel;
+  if (p === '/' || p === '') {
+    base = WWW;
+    rel = 'index.html';
+  } else if (p.startsWith('/assets/')) {
+    base = WWW;
+    rel = p.slice('/assets/'.length);
+  } else if (p.startsWith('/pdfs/')) {
+    base = PDF_DIR;
+    rel = p.slice('/pdfs/'.length);
+  } else {
+    res.writeHead(404);
+    return res.end('Not found');
+  }
+
+  const full = safeJoin(base, rel);
   if (!full) {
     res.writeHead(403);
     return res.end('Forbidden');
@@ -359,17 +315,7 @@ async function handle(req, res) {
 
 function startServer() {
   return new Promise((resolve, reject) => {
-    const srv = http.createServer((req, res) => {
-      handle(req, res).catch(() => {
-        try {
-          res.writeHead(500);
-          res.end('Server error');
-        } catch (e) {
-          /* تجاهل */
-        }
-      });
-    });
-
+    const srv = http.createServer(handle);
     const tryListen = (port) => {
       const onError = (err) => {
         if (err.code === 'EADDRINUSE' && port !== 0) tryListen(0);
@@ -387,6 +333,10 @@ function startServer() {
   });
 }
 
+function isLocalOrigin(value) {
+  return value === `http://127.0.0.1:${serverPort}` || value === `http://localhost:${serverPort}`;
+}
+
 // ---------- النافذة ----------
 function createWindow() {
   Menu.setApplicationMenu(null);
@@ -399,6 +349,7 @@ function createWindow() {
     backgroundColor: '#0b1220',
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'), // بيعرّف window.Android زي الأندرويد
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -444,7 +395,7 @@ function createWindow() {
 
   // عنوان النافذة بيعرض رقم الإصدار، ومش بيتغير من عنوان الصفحة
   win.on('page-title-updated', (e) => e.preventDefault());
-  win.loadURL(`http://127.0.0.1:${serverPort}/`);
+  win.loadURL(`http://127.0.0.1:${serverPort}/assets/index.html`);
   win.setTitle(`بورد PDF - الإصدار ${app.getVersion()}`);
 }
 
