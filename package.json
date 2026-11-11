@@ -8,7 +8,7 @@
     "sync": "npx cap sync android",
     "open": "npx cap open android",
     "start": "electron .",
-    "build:win": "electron-builder --win nsis --x64"
+    "build:win": "electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.0",
