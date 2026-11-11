@@ -975,7 +975,7 @@ body #solo-tabs,body #solo-tabs button{
  outline:2px solid var(--skin-accent,var(--accent))!important;outline-offset:2px;
 }
 /* Keep the paper/canvas itself clean and high-contrast for handwriting. */
-.app .board-paper,.app canvas,.app .pdf-page,.app .reader-page{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.app .board-paper,.app .pdf-page,.app .reader-page{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 @media(max-width:700px){
  .app .modal-box,.app .pal-box,.app .mm-box{border-radius:19px!important}
  .app .nav,.app .board-bar,.app .reader-bar{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -1866,7 +1866,49 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             }, 350);
         }
         window.addEventListener('pagehide', () => api.saveState(appState));
-        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { clearTimeout(lazySaveTimer); lazySaveTimer = null; api.saveState(appState); } });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                clearTimeout(lazySaveTimer);
+                lazySaveTimer = null;
+                api.saveState(appState);
+                return;
+            }
+
+            // بعض إصدارات WebView/Electron قد تتخلص من محتوى Canvas عند إرسال التطبيق للخلفية.
+            // نمسح كاش صفحات PDF ونعيد رسم الصفحة الحالية عند الرجوع بدل عرض Canvas أبيض.
+            setTimeout(async () => {
+                if (!$('reader') || !$('reader').classList.contains('open') || !reader.book) return;
+                const currentBook = reader.book;
+                try {
+                    pageCache.clear();
+                    await renderReader(true);
+                } catch (renderError) {
+                    // لو عامل PDF.js فقد الاتصال بالـ Worker أثناء الخلفية، أعد فتح المستند من مصدره.
+                    try {
+                        const replacement = await pdfjsLib.getDocument({ url: currentBook.url }).promise;
+                        if (reader.book !== currentBook) { replacement.destroy(); return; }
+                        const previous = reader.doc;
+                        reader.doc = replacement;
+                        reader.total = replacement.numPages;
+                        reader.page = Math.min(Math.max(1, reader.page), reader.total);
+                        if (previous) previous.destroy();
+                        pageCache.clear();
+                        await renderReader(true);
+                    } catch (recoveryError) {
+                        console.warn('تعذر استعادة صفحات PDF بعد الرجوع للتطبيق', recoveryError);
+                        showReaderError(recoveryError);
+                    }
+                }
+            }, 250);
+        });
+        window.addEventListener('pageshow', () => {
+            if ($('reader') && $('reader').classList.contains('open') && reader.book) {
+                setTimeout(() => {
+                    pageCache.clear();
+                    renderReader(true).catch(err => console.warn('تعذر إعادة رسم PDF:', err));
+                }, 250);
+            }
+        });
 
         // ==========================================
         // المظهر والملف الشخصي والخلفية
@@ -7510,7 +7552,7 @@ html[data-glass-skin] #reader .reader-stage{background:var(--ms-app-backdrop)!im
 html[data-glass-skin] #reader :is(.reader-bar,.reader-notes,.reader-foot,.rd-side,.rd-btn,.rd-pen-pop){background:linear-gradient(145deg,var(--ms-glass-a),rgba(255,255,255,.09),var(--ms-glass-b))!important;color:var(--ms-ui-text)!important;border-color:var(--ms-glass-border)!important}
 html[data-glass-skin] #reader .rpage,html[data-glass-skin] #reader .rpage canvas{background:#fff!important;color:#172033!important}
 /* Keep writing and reading surfaces untouched by glass effects. */
-html[data-glass-skin] :is(.board-paper,.board-canvas,#custom-canvas,.rpage,.rpage canvas,.pdf-page,.reader-page){backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+html[data-glass-skin] :is(.board-paper,.board-canvas,#custom-canvas,.rpage,.pdf-page,.reader-page){backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 /* These legacy controls conflict with the two requested appearance selectors. */
 #settings .set-row:has(#theme-toggle),#settings .set-row:has(#inp-eye){display:none!important}
 @media(max-width:600px){html[data-glass-skin] :is(.modal-box,.pal-box,.mm-box){backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}}
