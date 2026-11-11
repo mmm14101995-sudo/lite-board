@@ -7483,7 +7483,7 @@ html body #reader.paper .reader-notes{background:var(--pdf-glass)!important;colo
 html body #reader.paper .reader-btn,
 html body #reader.paper .rd-side,
 html body #reader.paper .rd-btn{background:var(--pdf-glass)!important;color:var(--pdf-text,var(--ms-ui-text,var(--text)))!important;border-color:var(--pdf-border)!important}
-html body #reader .rpage,html body #reader .rpage canvas{background:#fff!important;color:#172033!important}
+html body #reader .rpage,html body #reader .rpage>canvas:not(.note-layer){background:#fff!important;color:#172033!important}
 body[data-theme="light"] #reader{--pdf-text:#182235;--pdf-muted:#526078;--pdf-glass:linear-gradient(145deg,rgba(255,255,255,.78),rgba(255,255,255,.48) 55%,rgba(220,229,241,.35));--pdf-border:rgba(52,70,98,.22)}
 body[data-theme="light"] #reader .reader-stage{background:var(--pdf-stage)!important}
 body[data-theme="light"] #reader .reader-btn.active,
@@ -7544,7 +7544,7 @@ html[data-glass-skin] :is(button,a):hover :is(svg,i[data-icon]){opacity:1}
 html[data-glass-skin] #reader{background:var(--ms-app-backdrop)!important;color:var(--ms-ui-text)!important}
 html[data-glass-skin] #reader .reader-stage{background:var(--ms-app-backdrop)!important}
 html[data-glass-skin] #reader :is(.reader-bar,.reader-notes,.reader-foot,.rd-side,.rd-btn,.rd-pen-pop){background:linear-gradient(145deg,var(--ms-glass-a),rgba(255,255,255,.09),var(--ms-glass-b))!important;color:var(--ms-ui-text)!important;border-color:var(--ms-glass-border)!important}
-html[data-glass-skin] #reader .rpage,html[data-glass-skin] #reader .rpage canvas{background:#fff!important;color:#172033!important}
+html[data-glass-skin] #reader .rpage,html[data-glass-skin] #reader .rpage>canvas:not(.note-layer){background:#fff!important;color:#172033!important}
 /* Keep writing and reading surfaces untouched by glass effects. */
 html[data-glass-skin] :is(.board-paper,.board-canvas,#custom-canvas,.rpage,.pdf-page,.reader-page){backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 /* These legacy controls conflict with the two requested appearance selectors. */
