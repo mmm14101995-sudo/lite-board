@@ -236,9 +236,6 @@ body.lite .topbar, body.lite .lib-toolbar, body.lite .modal-box, body.lite .seg,
 body.lite .book-card:hover .cover { transform: none; }
 .rinner { position: relative;display: flex;flex-direction: row;direction: rtl;justify-content: center;align-items: center;gap: 12px;width: 100%;height: 100%;transform-origin: 0 0; }
 .rd-side, .rd-btn { position: absolute;z-index: 7;width: 56px;height: 56px;border-radius: 50%;border: 1px solid rgba(255,255,255,0.25);background: rgba(15,23,42,0.6);color: #fff;display: grid;place-items: center;cursor: pointer; }
-.rd-side { top: 50%;transform: translateY(-50%); }
-.rd-prev { right: 14px; }
-.rd-next { left: 14px; }
 .rd-corner { position: absolute;z-index: 7;right: 12px;top: 72px;display: flex;flex-direction: column;gap: 10px; }
 .rd-btn { position: static;width: 46px;height: 46px; }
 .reader-overlay.bars-hidden .rd-corner { top: 12px; }
@@ -1016,6 +1013,38 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
 @media(max-width:520px) { .ms-backdrop-options { grid-template-columns:1fr; } .ms-backdrop-btn { min-height:54px;flex-direction:row; } }
 
 </style>
+<style id="v5-scroll-float">
+/* v5: السبورة من غير المساحة الفاضية فوقها */
+html body.solo.board-active .app { padding-top: calc(10px + env(safe-area-inset-top, 0px)) !important; }
+html body .board.fs { top: 0 !important; height: 100% !important; }
+html body #reader { top: 0 !important; height: 100% !important; }
+/* القارئ: التمرير الرأسي */
+html body #reader #reader-stage { display: block !important; position: absolute !important; inset: 0 !important; padding: 0 !important; overflow: hidden !important; touch-action: none; direction: rtl; cursor: default; }
+html body #reader .rinner { display: flex !important; flex-direction: column !important; align-items: center !important; gap: 12px !important; width: 100% !important; height: auto !important; padding: 12px 0 !important; box-sizing: border-box; transform-origin: 0 0; }
+html body #reader .rrow { display: flex; flex-direction: row; direction: rtl; gap: 12px; flex-shrink: 0; }
+html body #reader .rrow > .rpage { flex-shrink: 0; }
+/* الأدوات طافية فوق الكتاب (مش بتاخد مساحة)، وتتخفي/تظهر بنقرة */
+html body #reader:not(.rd-bar-v) .reader-bar,
+html body #reader:not(.rd-bar-v) .reader-notes,
+html body #reader:not(.rd-bar-v) .reader-foot {
+  position: absolute !important; left: 0 !important; right: 0 !important; margin: 0 !important; z-index: 9 !important; box-sizing: border-box;
+  background: rgba(20, 20, 20, 0.84) !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+html body #reader.paper:not(.rd-bar-v) .reader-bar, html body #reader.paper:not(.rd-bar-v) .reader-notes, html body #reader.paper:not(.rd-bar-v) .reader-foot { background: rgba(220, 208, 179, 0.92) !important; }
+html body #reader:not(.rd-bar-v) .reader-bar { top: 0 !important; bottom: auto !important; padding-right: 130px !important; padding-left: 16px !important; }
+html body #reader:not(.rd-bar-v) .reader-notes { top: var(--rd-bar-h, 56px) !important; bottom: auto !important; }
+html body #reader:not(.rd-bar-v) .reader-foot { top: auto !important; bottom: var(--rd-bottom, 0px) !important; }
+html body #reader:not(.rd-bar-v) .reader-notes { flex-wrap: wrap !important; overflow: visible !important; justify-content: flex-start !important; transform: none !important; max-width: none !important; width: auto !important; }
+html body #reader:not(.rd-bar-v).bars-hidden .reader-bar, html body #reader:not(.rd-bar-v).bars-hidden .reader-notes, html body #reader:not(.rd-bar-v).bars-hidden .reader-foot { display: none !important; }
+html body #reader .rd-corner { top: 12px !important; right: 12px !important; z-index: 10 !important; flex-direction: row !important; }
+/* الكتاب يبدأ تحت الأشرطة عشان ما يتغطاش وهو ظاهر، ويتعدّل لما تتخفي */
+html body #reader:not(.rd-bar-v):not(.bars-hidden) .rinner { padding-top: calc(var(--rd-top-h, 56px) + 12px) !important; padding-bottom: calc(var(--rd-foot-h, 56px) + 12px) !important; }
+/* الشريط السفلي للتطبيق (الرئيسية/الوايت بورد/PDF) ما يغطيش فوتر القارئ */
+html body #reader:not(.fs) { height: auto !important; bottom: var(--rd-bottom, 0px) !important; }
+/* المساحة الفاضية في الشريط ما تاخدش اللمس: القلم والماوس يكتبوا على الكتاب من تحتها، والأزرار بس هي اللي بتتضغط */
+html body #reader:not(.rd-bar-v) .reader-bar, html body #reader:not(.rd-bar-v) .reader-notes, html body #reader:not(.rd-bar-v) .reader-foot { pointer-events: none !important; }
+html body #reader:not(.rd-bar-v) .reader-bar > *, html body #reader:not(.rd-bar-v) .reader-notes > *, html body #reader:not(.rd-bar-v) .reader-foot > * { pointer-events: auto !important; }
+</style>
 </head>
 <body data-theme="dark">
     <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -1486,8 +1515,6 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             <button class="rn-tool" id="tool-striped" title="قلم مخطط بلونين" aria-label="قلم مخطط بلونين" onclick="readerPenTap('striped')"><svg viewBox="0 0 26 40"><use href="#pn-body"/><path class="nib" d="M11 14.5 L12.4 4.5 H13 V14.5Z"/><path d="M13 4.5 H13.6 L15 14.5 H13Z" fill="#f8fafc"/><circle class="nib" cx="13" cy="4" r="1.5"/><rect class="nib" x="8" y="20.5" width="5" height="3"/><rect x="13" y="20.5" width="5" height="3" fill="#f8fafc"/></svg></button>
         </div>
         <div id="reader-stage" class="reader-stage" onclick="handleReaderTap(event)"></div>
-        <button class="rd-side rd-prev" title="الصفحة السابقة" onclick="prevPage()"><i data-icon="chevR"></i></button>
-        <button class="rd-side rd-next" title="الصفحة التالية" onclick="nextPage()"><i data-icon="chevL"></i></button>
         <div class="rd-corner">
             <button class="rd-btn" title="إخفاء أو إظهار الأدوات" onclick="toggleReaderBars()"><i data-icon="eye"></i></button>
             <button class="rd-btn" id="rd-fs-btn" title="ملء الشاشة" onclick="toggleReaderFs()"><i data-icon="maximize"></i></button>
@@ -3160,6 +3187,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             if (type !== 'lined' && type !== 'grid') return;
             appState.boardPaperPattern = type;
             boardDirty = true;
+            requestRender();
             refreshBoardPaperStyleChoices();
             applyBoardPaperPatternStyles();
             scheduleSave();
@@ -3169,6 +3197,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             if (![14, 20, 28, 40, 52].includes(size)) return;
             appState.boardPaperSize = size;
             boardDirty = true;
+            requestRender();
             refreshBoardPaperStyleChoices();
             applyBoardPaperPatternStyles();
             scheduleSave();
@@ -4824,6 +4853,17 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
                 y = Math.max(y, el.getBoundingClientRect().bottom - top0);
             }
             corner.style.top = (y + 12) + 'px';
+            const bar = R.querySelector('.reader-bar'), notes = R.querySelector('.reader-notes'), foot = R.querySelector('.reader-foot');
+            const vis = el => el && getComputedStyle(el).display !== 'none';
+            const barH = vis(bar) ? bar.offsetHeight : 0;
+            const topH = Math.max(barH, vis(notes) ? notes.offsetTop + notes.offsetHeight : 0);
+            R.style.setProperty('--rd-bar-h', barH + 'px');
+            R.style.setProperty('--rd-top-h', topH + 'px');
+            R.style.setProperty('--rd-foot-h', (vis(foot) ? foot.offsetHeight : 0) + 'px');
+            const tabs = document.getElementById('solo-tabs');
+            const tabsH = tabs && tabs.offsetParent !== null ? tabs.offsetHeight : 0;
+            R.style.setProperty('--rd-bottom', tabsH + 'px');
+
         }
         (function () {
             if (window.ResizeObserver) {
@@ -4838,7 +4878,6 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
         function toggleReaderBars() {
             $('reader').classList.toggle('bars-hidden');
             placeReaderCorner();
-            renderReader();
         }
 
         function setReaderFs(on) {
@@ -6428,6 +6467,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             }
             const inner = document.querySelector('#reader-stage .rinner');
             if (inner) inner.style.transform = 'translate(' + readerView.tx + 'px, ' + readerView.ty + 'px) scale(' + readerView.z + ')';
+            scheduleReaderLazy();
         }
 
         function readerSharpen() {
@@ -6449,9 +6489,11 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
         function clampReaderView() {
             const stage = $('reader-stage');
             const W = stage.clientWidth, H = stage.clientHeight;
-            if (readerView.z <= 1) { readerView.z = 1; readerView.tx = 0; readerView.ty = 0; return; }
-            readerView.tx = Math.min(0, Math.max(W - W * readerView.z, readerView.tx));
-            readerView.ty = Math.min(0, Math.max(H - H * readerView.z, readerView.ty));
+            const inner = stage.querySelector('.rinner');
+            const cw = inner ? inner.offsetWidth : W, ch = inner ? inner.offsetHeight : H;
+            if (readerView.z < 1) readerView.z = 1;
+            readerView.tx = Math.min(0, Math.max(W - cw * readerView.z, readerView.tx));
+            readerView.ty = Math.min(0, Math.max(H - ch * readerView.z, readerView.ty));
         }
 
         function readerPinchStart() {
@@ -6513,6 +6555,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
         readerStage.addEventListener('wheel', e => {
             if (!$('reader').classList.contains('open')) return;
             e.preventDefault();
+            if (!e.ctrlKey) { scrollReaderBy(-e.deltaY); return; }
             const r = readerStage.getBoundingClientRect();
             const px = e.clientX - r.left, py = e.clientY - r.top;
             const z0 = readerView.z;
@@ -6523,88 +6566,234 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             readerView.ty = py - wy * z1;
             clampReaderView();
             applyReaderView();
+            onReaderScrolled();
         }, { passive: false });
+
+        readerStage.addEventListener('pointerdown', e => {
+            if (reader.annotate || e.button > 0 || readerTouches.size >= 2 || readerPinch) return;
+            readerDidDrag = false;
+            readerDrag = { id: e.pointerId, y: e.clientY, ty0: readerView.ty, moved: false };
+        }, true);
+        readerStage.addEventListener('pointermove', e => {
+            if (!readerDrag || e.pointerId !== readerDrag.id || readerPinch || readerTouches.size >= 2) return;
+            const dy = e.clientY - readerDrag.y;
+            if (!readerDrag.moved && Math.abs(dy) < 6) return;
+            readerDrag.moved = true;
+            readerDidDrag = true;
+            readerView.ty = readerDrag.ty0 + dy;
+            clampReaderView();
+            applyReaderView();
+        }, true);
+        const endReaderDrag = e => {
+            if (!readerDrag || e.pointerId !== readerDrag.id) return;
+            const moved = readerDrag.moved;
+            readerDrag = null;
+            if (moved) { onReaderScrolled(); readerSaveSoon(); }
+        };
+        readerStage.addEventListener('pointerup', endReaderDrag, true);
+        readerStage.addEventListener('pointercancel', endReaderDrag, true);
 
         function cacheKey(pageNo, w, h, dpr) {
             return pageNo + '|' + Math.round(w) + 'x' + Math.round(h) + '|' + dpr;
+        }
+
+        // ---- وضع التمرير الرأسي ----
+        // كل الصفحات تحت بعض في صفوف (صفحة أو صفحتين). الصفحات اللي بعيدة عن الشاشة ما بتترسمش،
+        // والتمرير بيتم بنفس إزاحة التكبير readerView.ty، فالتكبير والتمرير بيشتغلوا مع بعض.
+        const READER_GAP = 12, READER_MARGIN = 12;
+        let readerRows = [];          // [{pages:[n], el, h, rendered, busy}]
+        let readerScale = 1;
+        let readerDidDrag = false;    // عشان الضغطة اللي بعد السحب ما تعتبرش نقرة
+        let readerDrag = null;
+        let readerLazyRaf = 0;
+        let readerScrollTimer = null;
+        let readerDimsDoc = null, readerDims = new Map();
+
+        function readerRowsFor(total, spread) {
+            const rows = [];
+            for (let n = 1; n <= total;) {
+                if (spread && n < total) { rows.push([n, n + 1]); n += 2; }
+                else { rows.push([n]); n += 1; }
+            }
+            return rows;
+        }
+
+        function rowIndexOf(n) {
+            return readerRows.findIndex(r => r.pages.includes(n));
+        }
+
+        function readerSaveSoon() {
+            clearTimeout(readerScrollTimer);
+            readerScrollTimer = setTimeout(saveProgress, 500);
+        }
+
+        function scrollToRow(i) {
+            const row = readerRows[i];
+            if (!row) return;
+            const pad = parseFloat(getComputedStyle(row.el.parentNode).paddingTop) || 0;   // الصف يقف تحت الأشرطة مش عليها
+            readerView.ty = -Math.max(0, row.el.offsetTop - pad) * readerView.z;
+            clampReaderView();
+            applyReaderView();
+            reader.page = row.pages[0];
+            updateReaderInfo();
+            readerSaveSoon();
+        }
+
+        function scrollToPage(n) {
+            const i = rowIndexOf(n);
+            if (i >= 0) scrollToRow(i);
+        }
+
+        function scrollReaderBy(dy) {
+            if (!readerRows.length) return;
+            readerView.ty += dy;
+            clampReaderView();
+            applyReaderView();
+            onReaderScrolled();
+        }
+
+        // الصفحة الحالية = الصف اللي في منتصف الشاشة
+        function onReaderScrolled() {
+            const stage = $('reader-stage');
+            if (!stage || !readerRows.length) return;
+            const centerY = (-readerView.ty + stage.clientHeight / 2) / readerView.z;
+            let cur = readerRows[0];
+            for (const row of readerRows) { if (row.el.offsetTop <= centerY) cur = row; else break; }
+            if (cur.pages[0] !== reader.page) {
+                reader.page = cur.pages[0];
+                updateReaderInfo();
+                readerSaveSoon();
+            }
+        }
+
+        function scheduleReaderLazy() {
+            if (readerLazyRaf) return;
+            readerLazyRaf = requestAnimationFrame(() => { readerLazyRaf = 0; updateReaderLazy(); });
+        }
+
+        function updateReaderLazy() {
+            const stage = $('reader-stage');
+            if (!stage || !readerRows.length || !reader.doc) return;
+            const z = readerView.z, vh = stage.clientHeight / z;
+            const top = -readerView.ty / z;
+            const token = reader.token;
+            for (const row of readerRows) {
+                const rt = row.el.offsetTop, rb = rt + row.h;
+                const near = rb >= top - vh * 0.5 && rt <= top + vh * 1.5;
+                const far = rb < top - vh * 3 || rt > top + vh * 4;
+                if (near && !row.rendered && !row.busy) renderReaderRow(row, token);
+                else if (far && row.rendered && !row.busy && !(activeStroke && row.pages.includes(activeStroke.pageNo))) unrenderReaderRow(row);
+            }
+        }
+
+        async function renderReaderRow(row, token) {
+            row.busy = true;
+            const lite = document.body.classList.contains('lite');
+            const dpr = lite ? Math.min(1.5, window.devicePixelRatio || 1) : (window.devicePixelRatio || 1);
+            const q = Math.max(dpr, readerQuality, lite ? 0 : 3);
+            const maxPx = lite ? 4096 : 6144;
+            try {
+                for (const pageNo of row.pages) {
+                    const wrap = row.el.querySelector('.rpage[data-page="' + pageNo + '"]');
+                    if (!wrap) continue;
+                    const page = await reader.doc.getPage(pageNo);
+                    if (token !== reader.token) return;
+                    const base = page.getViewport({ scale: 1 });
+                    const vp = page.getViewport({ scale: Math.min(readerScale * q, maxPx / Math.max(base.width, base.height)) });
+                    const pc = document.createElement('canvas');
+                    pc.width = Math.floor(vp.width);
+                    pc.height = Math.floor(vp.height);
+                    await page.render({ canvasContext: pc.getContext('2d'), viewport: vp }).promise;
+                    if (token !== reader.token) return;
+                    pc.style.width = wrap.style.width;
+                    pc.style.height = wrap.style.height;
+                    const layer = document.createElement('canvas');
+                    layer.className = 'note-layer';
+                    layer.width = pc.width;
+                    layer.height = pc.height;
+                    layer.style.width = wrap.style.width;
+                    layer.style.height = wrap.style.height;
+                    layer.style.position = 'absolute';
+                    layer.style.left = '0';
+                    layer.style.top = '0';
+                    layer.style.zIndex = '2';
+                    layer.style.touchAction = 'none';
+                    layer.style.pointerEvents = reader.annotate ? 'auto' : 'none';
+                    layer.style.cursor = reader.annotate ? 'none' : 'default';
+                    wrap.innerHTML = '';
+                    wrap.appendChild(pc);
+                    wrap.appendChild(layer);
+                    bindNoteLayer(layer, pageNo);
+                    drawNotesOn(layer, pageStrokes(pageNo));
+                    renderReaderStickies(wrap, pageNo);
+                }
+                row.rendered = true;
+            } catch (e) { /* صفحة واحدة تفشل ما توقفش القارئ */ }
+            finally { row.busy = false; }
+        }
+
+        function unrenderReaderRow(row) {
+            row.el.querySelectorAll('.rpage').forEach(w => { w.innerHTML = ''; });
+            row.rendered = false;
         }
 
         async function renderReader(keepView) {
             if (!reader.doc) return;
             const token = ++reader.token;
             const stage = $('reader-stage');
-            const count = reader.spread && reader.page < reader.total ? 2 : 1;
-            const dpr = document.body.classList.contains('lite') ? Math.min(1.5, window.devicePixelRatio || 1) : (window.devicePixelRatio || 1);
-            const cssW = stage.clientWidth - 24;
-            const cssH = stage.clientHeight - 24;
-            readerRendered = { w: stage.clientWidth, h: stage.clientHeight };
-            const wraps = [];
+            const W = stage.clientWidth, H = stage.clientHeight;
+            if (readerDimsDoc !== reader.doc) { readerDimsDoc = reader.doc; readerDims = new Map(); }
+            const rowsDef = readerRowsFor(reader.total, reader.spread);
+            for (const row of rowsDef) for (const n of row) {
+                if (readerDims.has(n)) continue;
+                const page = await reader.doc.getPage(n);
+                if (token !== reader.token) return;
+                const vp = page.getViewport({ scale: 1 });
+                readerDims.set(n, { w: vp.width, h: vp.height });
+            }
+            if (token !== reader.token) return;
+            // ملء عرض الشاشة لكل الصفوف بنفس المقياس
+            const availW = Math.max(60, W - READER_MARGIN * 2);
+            let scale = Infinity;
+            for (const row of rowsDef) {
+                const sumW = row.reduce((s, n) => s + readerDims.get(n).w, 0);
+                scale = Math.min(scale, (availW - READER_GAP * (row.length - 1)) / sumW);
+            }
+            if (!isFinite(scale) || scale <= 0) scale = 1;
+            readerScale = scale;
+            readerRendered = { w: W, h: H };
             if (!keepView) readerView = { z: 1, tx: 0, ty: 0 };
 
-            for (let i = 0; i < count; i++) {
-                const pageNo = reader.page + i;
-                const page = await reader.doc.getPage(pageNo);
-                if (token !== reader.token) return;
-                const base = page.getViewport({ scale: 1 });
-                const fit = Math.min((cssW / count) / base.width, cssH / base.height);
-                const q = Math.max(dpr, readerQuality, document.body.classList.contains('lite') ? 0 : 3);
-                const maxPx = document.body.classList.contains('lite') ? 4096 : 6144;   // حد أقصى لأبعاد الكانفاس
-                const renderScale = Math.min(fit * q, maxPx / Math.max(base.width, base.height));
-                const vp = page.getViewport({ scale: renderScale });
-                const key = cacheKey(pageNo, vp.width, vp.height, q);
-                let pc = pageCache.get(key);
-                if (!pc) {
-                    pc = document.createElement('canvas');
-                    pc.width = Math.floor(vp.width);
-                    pc.height = Math.floor(vp.height);
-                    await page.render({ canvasContext: pc.getContext('2d'), viewport: vp }).promise;
-                    if (token !== reader.token) return;
-                    pageCache.set(key, pc);
-                    if (pageCache.size > 8) pageCache.delete(pageCache.keys().next().value);
-                }
-                const cssWpx = (base.width * fit) + 'px';
-                const cssHpx = (base.height * fit) + 'px';
-                pc.style.width = cssWpx;
-                pc.style.height = cssHpx;
-
-                const wrap = document.createElement('div');
-                wrap.className = 'rpage';
-                wrap.dataset.page = pageNo;
-                wrap.style.width = cssWpx;
-                wrap.style.height = cssHpx;
-
-                const layer = document.createElement('canvas');
-                layer.className = 'note-layer';
-                layer.width = pc.width;
-                layer.height = pc.height;
-                layer.style.width = cssWpx;
-                layer.style.height = cssHpx;
-                layer.style.position = 'absolute';
-                layer.style.left = '0';
-                layer.style.top = '0';
-                layer.style.zIndex = '2';
-                layer.style.touchAction = 'none';
-                layer.style.pointerEvents = reader.annotate ? 'auto' : 'none';
-                layer.style.cursor = reader.annotate ? 'none' : 'default';
-
-                wrap.appendChild(pc);
-                wrap.appendChild(layer);
-                bindNoteLayer(layer, pageNo);
-                drawNotesOn(layer, pageStrokes(pageNo));
-                renderReaderStickies(wrap, pageNo);
-                wraps.push(wrap);
-            }
-
-            stage.innerHTML = '';
             const inner = document.createElement('div');
             inner.className = 'rinner';
-            wraps.forEach(w => inner.appendChild(w));
+            readerRows = rowsDef.map(pages => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'rrow';
+                let rowW = 0, rowH = 0;
+                for (const n of pages) {
+                    const d = readerDims.get(n);
+                    const w = d.w * scale, h = d.h * scale;
+                    const wrap = document.createElement('div');
+                    wrap.className = 'rpage';
+                    wrap.dataset.page = n;
+                    wrap.style.width = w + 'px';
+                    wrap.style.height = h + 'px';
+                    rowEl.appendChild(wrap);
+                    rowW += w; rowH = Math.max(rowH, h);
+                }
+                rowEl.style.width = (rowW + READER_GAP * (pages.length - 1)) + 'px';
+                rowEl.style.height = rowH + 'px';
+                inner.appendChild(rowEl);
+                return { pages, el: rowEl, h: rowH, rendered: false, busy: false };
+            });
+            stage.innerHTML = '';
             stage.appendChild(inner);
             if (keepView) clampReaderView();
+            else scrollToPage(reader.page);
             applyReaderView();
             updateReaderInfo();
             syncAnnotateUI();
-            prefetchReaderPages(token, count, dpr, cssW, cssH);
+            scheduleReaderLazy();
         }
 
         // تجهيز الصفحات اللي جنب الصفحة الحالية في الخلفية (بنفس الدقة بالظبط) عشان التقليب يبقى فوري
@@ -6665,10 +6854,8 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             if (!Number.isFinite(n)) { updateReaderInfo(); return; }
             n = Math.max(1, Math.min(reader.total, n));
             if (n === reader.page) { updateReaderInfo(); return; }
-            reader.page = n;
-            keepReaderZoom();
+            scrollToPage(n);
             saveProgress();
-            renderReader(true);
         }
         (function bindPageJump() {
             const inp = $('page-jump');
@@ -6683,24 +6870,20 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
         })();
 
         function step(dir) {
-            if (!reader.doc) return;
-            const amount = reader.spread ? 2 : 1;
-            const next = Math.max(1, Math.min(reader.total, reader.page + dir * amount));
-            if (next === reader.page) return;
-            reader.page = next;
-            keepReaderZoom();
-            saveProgress();
-            renderReader(true);
+            if (!reader.doc || !readerRows.length) return;
+            let i = rowIndexOf(reader.page);
+            if (i < 0) i = 0;
+            const j = Math.max(0, Math.min(readerRows.length - 1, i + dir));
+            if (j !== i) scrollToRow(j);
         }
 
         function nextPage() { step(1); }
         function prevPage() { step(-1); }
 
+        // النقرة (من غير سحب) بتظهر/تخفي الأدوات، والأدوات طافية فوق الكتاب
         function handleReaderTap(e) {
-            if (reader.annotate || readerNoTap) return;   // وضع الكتابة أو بعد التكبير: ما نقلبش الصفحة
-            const r = $('reader-stage').getBoundingClientRect();
-            if (e.clientX - r.left < r.width / 2) nextPage();
-            else prevPage();
+            if (reader.annotate || readerNoTap || readerDidDrag) return;
+            toggleReaderBars();
         }
 
         function toggleSpread() {
@@ -6823,6 +7006,7 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
             reader.doc = null;
             reader.book = null;
             reader.annotate = false;
+            readerRows = [];
             liveInkStop();
             activeStroke = null;
             $('reader-stage').innerHTML = '';
@@ -6845,7 +7029,9 @@ body { background-image:radial-gradient(ellipse at 14% 12%,rgba(91,133,167,.24),
                 if (e.target && e.target.id === 'page-jump') return;
                 if (e.key === 'Escape') { closeReader(); return; }
                 if (reader.annotate) return;
-                if (e.key === 'ArrowLeft' || e.key === ' ') { e.preventDefault(); nextPage(); }
+                if (e.key === 'ArrowDown') { e.preventDefault(); scrollReaderBy(-120); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); scrollReaderBy(120); }
+                else if (e.key === 'ArrowLeft' || e.key === ' ') { e.preventDefault(); nextPage(); }
                 else if (e.key === 'ArrowRight') { e.preventDefault(); prevPage(); }
             } else if (e.key === 'Escape') {
                 if (closeTopModal()) { /* تم إغلاق النافذة */ }
@@ -7327,7 +7513,7 @@ button.primary,.btn-primary,.home-resume button,.home-set button{
  box-shadow:0 7px 18px rgba(194,43,78,.22),inset 0 1px 0 rgba(255,255,255,.25) !important;
 }
 /* Red and blue accents are restrained to controls; keep paper/canvas neutral. */
-.board,.board canvas,.canvas-wrap,.pdf-page,.page-paper,.sheet,.paper,
+.board,.board canvas:not(.sticky-ink),.canvas-wrap,.pdf-page,.page-paper,.sheet,.paper,
 #board-canvas,#pdf-canvas{background:#fff !important;}
 :focus-visible{outline:2px solid rgba(230,75,98,.8) !important;outline-offset:2px;}
 @media(max-width:600px){
@@ -7534,6 +7720,9 @@ html[data-glass-skin] :is(body,.app,.main,.view,.topbar,.nav,.set-lbl,.set-sec,.
 html[data-glass-skin] :is(.muted,.hint,.subtle,.set-desc,.description,.book-meta,.shelf-count,.home-sub,.home-stat small,.ms-backdrop-note){color:var(--ms-ui-muted)!important}
 html[data-glass-skin] :is(input:not([type=checkbox]):not([type=radio]),textarea,select){color:var(--ms-ui-text)!important;border-color:var(--ms-glass-border)!important;background:linear-gradient(145deg,var(--ms-glass-a),var(--ms-glass-b))!important}
 html[data-glass-skin] :is(input,textarea)::placeholder{color:var(--ms-ui-muted)!important;opacity:1}
+/* Sticky notes keep their own ink colour (the glass input rule above made the text light-on-light). */
+html body #board-stage .sticky textarea,html body #reader .sticky textarea{color:var(--note-ink,#1e293b)!important}
+html body #board-stage .sticky textarea::placeholder,html body #reader .sticky textarea::placeholder{color:rgba(30,41,59,.45)!important}
 html[data-glass-skin] select option{background:#182536;color:#f4f7fb}
 html[data-glass-skin] :is(.modal,.reader-overlay){backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 html[data-glass-skin] .modal{background:rgba(2,8,18,.58)!important}
